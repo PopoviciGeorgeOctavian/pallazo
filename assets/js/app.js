@@ -33,7 +33,7 @@
     const target = document.querySelector(hash);
     if (!target) return false;
     const navH = (nav && nav.offsetHeight) || 70;
-    const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - navH - 8);
+    const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - navH);
     try {
       window.scrollTo({ top, behavior: 'smooth' });
     } catch {
@@ -63,7 +63,7 @@
     if (e.key === 'Escape' && menuBtn.getAttribute('aria-expanded') === 'true') setDrawer(false);
   });
 
-  /* ---------- Reveal on scroll (flat + 3D) ---------- */
+  /* ---------- Reveal on scroll ---------- */
   const revealEls = document.querySelectorAll('.reveal, .reveal-3d, .gold-grow');
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
@@ -73,10 +73,53 @@
           io.unobserve(en.target);
         }
       });
-    }, { threshold: 0, rootMargin: '0px 0px 120px 0px' });
+    }, {
+      rootMargin: '0px 0px 0px 0px',
+      threshold: 0.04,
+    });
     revealEls.forEach(el => io.observe(el));
+    // Ensure elements already in viewport on load are revealed immediately
+    requestAnimationFrame(() => {
+      const vh = window.innerHeight;
+      revealEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < vh && r.bottom > 0) {
+          el.classList.add('in');
+          io.unobserve(el);
+        }
+      });
+    });
   } else {
     revealEls.forEach(el => el.classList.add('in'));
+  }
+
+  /* ---------- Stat counter ---------- */
+  const statNums = document.querySelectorAll('.despre__stat-num');
+  if (statNums.length && 'IntersectionObserver' in window) {
+    const animateCount = (el) => {
+      const small = el.querySelector('small');
+      const smallHTML = small ? small.outerHTML : '';
+      const target = parseInt(el.textContent, 10);
+      if (!target || isNaN(target)) return;
+      const dur = 1400;
+      const start = performance.now();
+      const tick = (now) => {
+        const progress = Math.min((now - start) / dur, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.innerHTML = Math.round(eased * target) + smallHTML;
+        if (progress < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    const countIO = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          animateCount(en.target);
+          countIO.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    statNums.forEach(el => countIO.observe(el));
   }
 
   /* ---------- Scroll-linked parallax tilt (exposes --tp 0..1) ---------- */
@@ -451,30 +494,45 @@
     b.addEventListener('click', (e) => { e.preventDefault(); showCookie(); });
   });
 
-  /* ---------- Hero video — start at offset + reduced motion ---------- */
+  /* ---------- Hero video ---------- */
   const heroVideo = document.querySelector('.hero__bg-video');
   if (heroVideo) {
-    const startSec = parseFloat(heroVideo.dataset.start) || 0;
-
-    const seekToStart = () => {
-      if (heroVideo.currentTime < startSec) heroVideo.currentTime = startSec;
-    };
-
-    heroVideo.addEventListener('loadedmetadata', () => {
-      heroVideo.currentTime = startSec;
-    });
-
-    // On loop restart the currentTime drops to 0 — bring it back to startSec
-    heroVideo.addEventListener('timeupdate', seekToStart);
+    const startSec  = parseFloat(heroVideo.dataset.start) || 0;
+    const endBuffer = parseFloat(heroVideo.dataset.end)   || 3;
+    let videoDur = 0;
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       heroVideo.removeAttribute('autoplay');
+      heroVideo.style.opacity = '1';
       heroVideo.pause();
-    }
+    } else {
+      // Seek la frame-ul corect ÎNAINTE de a afișa video-ul.
+      // seeked (once) → reveal + play. Fără poster, fără frame negru.
+      heroVideo.addEventListener('seeked', () => {
+        heroVideo.style.opacity = '1';
+        heroVideo.play().catch(() => {});
+      }, { once: true });
 
-    document.addEventListener('visibilitychange', () => {
-      document.hidden ? heroVideo.pause() : heroVideo.play().catch(() => {});
-    });
+      heroVideo.addEventListener('loadedmetadata', () => {
+        videoDur = heroVideo.duration;
+        heroVideo.currentTime = startSec;
+      });
+
+      // Loopback manual: sare înapoi la startSec cu 3s înainte de final
+      heroVideo.addEventListener('timeupdate', () => {
+        if (heroVideo.currentTime < startSec) {
+          heroVideo.currentTime = startSec;
+          return;
+        }
+        if (videoDur > 0 && heroVideo.currentTime >= videoDur - endBuffer) {
+          heroVideo.currentTime = startSec;
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        document.hidden ? heroVideo.pause() : heroVideo.play().catch(() => {});
+      });
+    }
   }
 
   /* ---------- Year stamp ---------- */

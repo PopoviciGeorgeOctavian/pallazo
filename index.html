@@ -37,13 +37,8 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="manifest" href="assets/site.webmanifest">
 
-  <!-- Preconnect & preload critical assets -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Preload critical assets -->
   <link rel="preload" as="image" href="assets/img-opt/hall-grand-960.webp" imagesrcset="assets/img-opt/hall-grand-480.webp 480w, assets/img-opt/hall-grand-960.webp 960w, assets/img-opt/hall-grand-1600.webp 1600w" imagesizes="100vw" fetchpriority="high">
-
-  <!-- Fonts (display=swap for FOUT instead of FOIT) -->
-  <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
   <!-- Styles -->
   <link rel="stylesheet" href="assets/css/style.css">
@@ -112,7 +107,7 @@
     </ul>
   </nav>
 
-  <a href="#contact" class="nav__cta">Trăiește magia</a>
+  <a href="#contact" class="nav__cta">Rezervă</a>
 
   <button class="nav__menu-btn" aria-label="Deschide meniul" aria-expanded="false" aria-controls="drawer">
     <span></span>
@@ -151,10 +146,10 @@
   <div class="hero__media" aria-hidden="true">
     <video
       class="hero__bg-video"
-      autoplay muted loop playsinline
+      autoplay muted playsinline
       preload="auto"
-      poster="assets/img/hall-grand.jpg"
-      data-start="8">
+      data-start="7"
+      data-end="3">
       <source src="assets/video/main.mp4" type="video/mp4">
     </video>
   </div>
@@ -165,12 +160,11 @@
     <p class="hero__sub">Wedding &middot; Events &middot; Celebrations</p>
     <p class="hero__lead">Locul în care promisiunile capătă lumină — un palat contemporan pentru cea mai importantă seară a vieții voastre.</p>
     <div>
-      <a href="#contact" class="hero__cta">Trăiește magia <span aria-hidden="true">→</span></a>
+      <a href="#contact" class="hero__cta">Rezervă</a>
       <a href="#galerie" class="hero__cta-secondary">Vezi galeria</a>
     </div>
   </div>
 
-  <div class="hero__scroll" aria-hidden="true">Scroll</div>
 </section>
 
 <div class="gold-grow" aria-hidden="true"></div>
@@ -221,7 +215,7 @@
   <div class="wrap">
     <header class="sec-head sec-head--center reveal-3d">
       <span class="eyebrow">Interioare</span>
-      <h2 class="sec-head__title" id="galerie-title">Sala <em class="script">Palazzo</em></h2>
+      <h2 class="sec-head__title" id="galerie-title">Sala <em class="wordmark">Palazzo</em></h2>
       <p class="sec-head__lede">Coloane, candelabre din cristal și un tavan ornat care înnobilează fiecare moment.</p>
     </header>
 
@@ -277,7 +271,7 @@
   <div class="wrap">
     <header class="sec-head reveal-3d">
       <span class="eyebrow">Gusturi rafinate</span>
-      <h2 class="sec-head__title" id="meniu-title">Bucătăria <em class="script">Palazzo</em></h2>
+      <h2 class="sec-head__title" id="meniu-title">Bucătăria <em class="wordmark">Palazzo</em></h2>
       <p class="sec-head__lede">Preparate semnătură, executate cu grijă, servite la temperatura potrivită.</p>
     </header>
 
