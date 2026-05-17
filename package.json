@@ -1,0 +1,23 @@
+{
+  "name": "pallazo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "fix.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PopoviciGeorgeOctavian/pallazo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PopoviciGeorgeOctavian/pallazo/issues"
+  },
+  "homepage": "https://github.com/PopoviciGeorgeOctavian/pallazo#readme",
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}

@@ -27,13 +27,44 @@
     const open = menuBtn.getAttribute('aria-expanded') !== 'true';
     setDrawer(open);
   });
-  drawer.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
+  /* Smooth scroll helper — uses real nav height so offset is correct on mobile + desktop */
+  const scrollToHash = (hash) => {
+    if (!hash || hash.length < 2) return false;
+    const target = document.querySelector(hash);
+    if (!target) return false;
+    const navH = (nav && nav.offsetHeight) || 70;
+    const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - navH - 8);
+    try {
+      window.scrollTo({ top, behavior: 'smooth' });
+    } catch {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return true;
+  };
+
+  drawer.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      setDrawer(false);
+      if (href && href.startsWith('#') && href.length > 1) {
+        // Stop the global smooth-anchor handler from also firing (registered later)
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        // Wait for drawer slide-out (0.6s) before scrolling, then retry once if layout shifted
+        setTimeout(() => {
+          if (scrollToHash(href)) {
+            setTimeout(() => scrollToHash(href), 700);
+          }
+        }, 420);
+      }
+    });
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && menuBtn.getAttribute('aria-expanded') === 'true') setDrawer(false);
   });
 
-  /* ---------- Reveal on scroll ---------- */
-  const revealEls = document.querySelectorAll('.reveal, .gold-grow');
+  /* ---------- Reveal on scroll (flat + 3D) ---------- */
+  const revealEls = document.querySelectorAll('.reveal, .reveal-3d, .gold-grow');
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach(en => {
@@ -42,11 +73,111 @@
           io.unobserve(en.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    }, { threshold: 0, rootMargin: '0px 0px 120px 0px' });
     revealEls.forEach(el => io.observe(el));
   } else {
     revealEls.forEach(el => el.classList.add('in'));
   }
+
+  /* ---------- Scroll-linked parallax tilt (exposes --tp 0..1) ---------- */
+  const tilts = document.querySelectorAll('.tilt-on-scroll');
+  if (tilts.length) {
+    let ticking = false;
+    const updateTilts = () => {
+      const vh = window.innerHeight;
+      tilts.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const total = vh + r.height;
+        const seen = vh - r.top;
+        const p = Math.max(0, Math.min(1, seen / total));
+        el.style.setProperty('--tp', p.toFixed(3));
+      });
+      ticking = false;
+    };
+    const requestTilt = () => {
+      if (!ticking) { window.requestAnimationFrame(updateTilts); ticking = true; }
+    };
+    window.addEventListener('scroll', requestTilt, { passive: true });
+    window.addEventListener('resize', requestTilt);
+    updateTilts();
+  }
+
+  /* ---------- Card mouse-tracking 3D tilt ---------- */
+  document.querySelectorAll('.card').forEach((card) => {
+    let raf = 0;
+    card.addEventListener('mousemove', (e) => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        card.style.transform = `translateY(-6px) perspective(900px) rotateX(${(-y * 4).toFixed(2)}deg) rotateY(${(x * 5).toFixed(2)}deg)`;
+      });
+    });
+    card.addEventListener('mouseleave', () => {
+      cancelAnimationFrame(raf);
+      card.style.transform = '';
+    });
+  });
+
+  /* ---------- Blur-up: mark figures as loaded when img is ready ---------- */
+  const markLoaded = (img) => {
+    const fig = img.closest('.media-blur');
+    if (fig) fig.classList.add('is-loaded');
+  };
+  document.querySelectorAll('.media-blur > img').forEach((img) => {
+    if (img.complete && img.naturalWidth > 0) {
+      markLoaded(img);
+    } else {
+      img.addEventListener('load', () => markLoaded(img), { once: true });
+      img.addEventListener('error', () => markLoaded(img), { once: true });
+    }
+  });
+
+  /* ---------- Aggressive lazy preloader (beats native loading="lazy" timing) ----------
+     Native lazy + reveal-3d (opacity:0) makes images appear too late on long scrolls.
+     We pre-warm the network so the high-res arrives before the user reaches the figure. */
+  if ('IntersectionObserver' in window) {
+    const forceLoad = (img) => {
+      if (img.dataset.warmed === '1') return;
+      img.dataset.warmed = '1';
+      // Flip to eager so the browser actually issues the request now.
+      img.loading = 'eager';
+      // Belt-and-suspenders: issue a parallel fetch through a detached Image so
+      // browsers that ignore loading-attribute mutation still warm the cache.
+      const pre = new Image();
+      if (img.sizes)  pre.sizes  = img.sizes;
+      if (img.srcset) pre.srcset = img.srcset;
+      pre.src = img.currentSrc || img.src;
+    };
+    const lazyIO = new IntersectionObserver((entries, obs) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        forceLoad(e.target);
+        obs.unobserve(e.target);
+      });
+    }, {
+      // Start loading well before the figure scrolls in.
+      rootMargin: '1200px 0px 1600px 0px',
+      threshold: 0,
+    });
+    document.querySelectorAll('img[loading="lazy"]').forEach((img) => lazyIO.observe(img));
+  }
+
+  /* ---------- Hover/touch prefetch of full-size for instant lightbox ---------- */
+  const prefetched = new Set();
+  const warmFull = (el) => {
+    const u = el.getAttribute('data-lightbox-full');
+    if (!u || prefetched.has(u)) return;
+    prefetched.add(u);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = u;
+  };
+  document.querySelectorAll('[data-lightbox-full]').forEach((el) => {
+    el.addEventListener('pointerenter', () => warmFull(el), { passive: true });
+    el.addEventListener('touchstart', () => warmFull(el), { passive: true, once: true });
+  });
 
   /* ---------- Lightbox ---------- */
   const lbItems = document.querySelectorAll('[data-lightbox]');
@@ -58,30 +189,44 @@
   const lbNext = lb.querySelector('.lightbox__next');
   let lbList = [];
   let lbIndex = 0;
+  const prefetchImg = (url) => { if (url) { const i = new Image(); i.src = url; } };
   const openLb = (i) => {
     lbIndex = i;
     const item = lbList[i];
+    lb.classList.remove('is-loaded');
+    if (item.lqip) lb.style.setProperty('--lb-lqip', `url('${item.lqip}')`);
     lbImg.src = item.src;
     lbImg.alt = item.alt || '';
     lbCap.textContent = item.cap || '';
     lb.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+    const onReady = () => lb.classList.add('is-loaded');
+    if (lbImg.complete && lbImg.naturalWidth > 0) onReady();
+    else lbImg.addEventListener('load', onReady, { once: true });
+    const n = lbList.length;
+    if (n > 1) {
+      prefetchImg(lbList[(i + 1) % n].src);
+      prefetchImg(lbList[(i - 1 + n) % n].src);
+    }
   };
   const closeLb = () => {
     lb.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('no-scroll');
     lbImg.src = '';
+    lb.classList.remove('is-loaded');
   };
   const stepLb = (d) => openLb((lbIndex + d + lbList.length) % lbList.length);
 
-  lbItems.forEach((el, i) => {
+  lbItems.forEach((el) => {
     el.addEventListener('click', () => {
       lbList = Array.from(document.querySelectorAll('[data-lightbox]')).map(n => {
         const img = n.querySelector('img');
+        const lqipMatch = (n.getAttribute('style') || '').match(/--lqip:\s*url\(['"]?([^'")]+)['"]?\)/);
         return {
           src: n.dataset.lightboxFull || (img && img.currentSrc) || (img && img.src),
           alt: img ? img.alt : '',
-          cap: n.dataset.caption || (img && img.alt) || ''
+          cap: n.dataset.caption || (img && img.alt) || '',
+          lqip: lqipMatch ? lqipMatch[1] : null,
         };
       });
       const idx = Array.from(lbItems).indexOf(el);
@@ -336,18 +481,24 @@
   const yEl = document.getElementById('year');
   if (yEl) yEl.textContent = new Date().getFullYear();
 
-  /* ---------- Smooth anchor (with header offset) ---------- */
+  /* ---------- Smooth anchor (uses scrollToHash from above) ---------- */
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', (e) => {
       const id = a.getAttribute('href');
-      if (id.length < 2) return;
-      const target = document.querySelector(id);
-      if (!target) return;
+      if (!id || id.length < 2) return;
+      if (!document.querySelector(id)) return;
       e.preventDefault();
-      const top = target.getBoundingClientRect().top + window.scrollY - 70;
-      window.scrollTo({ top, behavior: 'smooth' });
+      // Retry after 700ms in case lazy images / reveal animations changed layout mid-scroll
+      if (scrollToHash(id)) {
+        setTimeout(() => scrollToHash(id), 700);
+      }
     });
   });
+
+  /* Honor #hash on initial page load (after layout settles) */
+  if (location.hash && document.querySelector(location.hash)) {
+    setTimeout(() => scrollToHash(location.hash), 100);
+  }
 
   /* ---------- Custom Date Picker ---------- */
   (() => {

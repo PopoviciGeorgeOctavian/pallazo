@@ -1,0 +1,5 @@
+node_modules/
+*   `git rm -r --cached .` — Îi spune lui Git: "Uită tot ce știai/
+build/
+.env
+.vscode/
